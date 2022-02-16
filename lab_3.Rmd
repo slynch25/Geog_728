@@ -1,0 +1,237 @@
+---
+title: "Lab 3"
+author: "Shannon Lynch"
+date: "2/15/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Question 1
+
+**This is a rather large dataset so start by reducing this down to the first 24 and last 12 variables in the original set.** 
+
+
+```{r Q1}
+#load libraries 
+library(ggplot2)
+library(dplyr)
+
+#load data
+
+Food<-read.csv("FoodAtlas.csv")
+
+#select the first 24 variables and last 12
+
+Sub_food<-Food %>% 
+  select(1:24, 136:147) 
+
+```
+
+## Question 2
+
+**Examine this reduced dataset and describe what type of data you’re working with. What is the data structure? What types of variables? Etc…**
+
+We are working with census data. This includes descriptive information, as characters, such as State and county. This dataset also includes several variables as integers with only the presence (1) or absence (0), which are used to identify statistics associated with impoverished areas. This includes variables like urban, groupQuartersflag, various distances for food deserts and low access. We also have a lot of integers that are count data, such as pop2010 (2010 census count), group housing units, and total counts of various ethnicities and age groups.  This data would be considered tidy because each variable has its own column, with each observation having its own row, making each individual cells with their own value. 
+
+```{r Q2}
+
+head(Sub_food)
+
+```
+
+## Question 3
+
+**Now make a new data object for the state of Kansas that includes just County, POP2010, LAhalfand10, MedianFamilyIncome,TractSNAP, and TractKids variables.**
+
+```{r Q3}
+#creating new data object with specified variables 
+Kansas_sub <- Sub_food %>%
+  filter(State == "Kansas") %>%
+  select(County, POP2010, LAhalfand10, MedianFamilyIncome,TractSNAP, TractKids)
+
+
+```
+
+## Question 4
+
+**Create a plot to illustrate the differences in MedianFamilyIncome across counties in Kansas. Are there significant differences across counties? Which counties have the greatest variation in income?**
+
+I would say it is unlikely there are significant differences since all of the bars overlap for each county. I still believe there is a chance some significant difference my exist since the distributions of these bars and whiskers vary greatly. The three counties that had the highest variation (standard deviation) were Johnson (36192.6365), Riley (24113.2772), Sedgwick (28224.0509). 
+
+```{r Q4}
+#create the plot 
+ggplot(Kansas_sub)+
+  geom_boxplot(aes(x= County, y= MedianFamilyIncome)) +
+  theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+#examine the SD to see with county varied the most
+
+Kansas_sub %>% 
+  group_by(County) %>%
+  summarize(SD_MFI = sd(MedianFamilyIncome)) %>%
+  arrange(SD_MFI)
+
+```
+
+## Question 5
+
+**Now check to see how MedianFamilyIncome compares across locations with low (or not) food accessibility (LAhalfand10). Compare using both basic descriptive statistics and graphical representation. What did you find**
+
+I found no obvious difference in medianfamilyincome when examining across all locations. When examining by county, 8 out of 10 of the highest mean medianfamilyincomes did not have low food accessibility. When plotting all of the counties, all of the boxplots overlap suggesting a lack in a significant difference. 
+
+```{r Q5}
+
+#descriptive statistics
+Kansas_sub %>% 
+  group_by(County, LAhalfand10) %>%
+  summarize(SD_MFI = sd(MedianFamilyIncome),
+            AVG_MFI = mean(MedianFamilyIncome)) %>%
+  arrange(desc(AVG_MFI))
+
+
+#make LAhalfand10 flag a character instead of an interger    
+Kansas_sub<-Kansas_sub %>% 
+  mutate(LAhalfand10 = as.character(LAhalfand10)) 
+         
+#plot all counties combined
+ggplot(Kansas_sub)+
+  geom_boxplot(aes(x= LAhalfand10, y= MedianFamilyIncome)) +
+  theme_minimal ()
+
+#plot all counties seperate 
+ggplot(Kansas_sub)+
+  geom_boxplot(aes(x= County, y= MedianFamilyIncome, color= LAhalfand10)) +
+  theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10))
+
+
+```
+
+## Question 6
+
+**Choose one other variable in your Kansas data and examine the variations across counties and food accessibility using both descriptive statistics and graphical comparison. What did you find?**
+
+I found somewhat of a difference in TractSNAP when examining across all locations. Low accessibilty to food had a higher average of houses receiving benefits. When examining by county, 7 out of 10 of the highest mean number of households recieving snap benefits had low food accessibility. When plotting all of the counties, all of the boxplots overlap but to a greater degree than the previous variable, medianfamilyincome, suggesting a greater chance of find a significant difference for some counties.
+
+```{r Q6}
+
+#Summary stats and plot for TractSNAP (count of houses who receive SNAP benefits) and food accessibility 
+Kansas_sub %>% 
+  group_by(LAhalfand10) %>%
+  summarize(SD_SNAP = sd(TractSNAP),
+            AVG_SNAP = mean(TractSNAP)) %>%
+  arrange(AVG_SNAP)
+
+#all counties
+ggplot(Kansas_sub)+
+  geom_boxplot(aes(x= LAhalfand10, y= TractSNAP)) +
+  theme_minimal ()
+
+#Summary stats and plot for TractSNAP (count of houses who receive SNAP benefits) by county 
+Kansas_sub %>% 
+  group_by(County,LAhalfand10) %>%
+  summarize(SD_SNAP = sd(TractSNAP),
+            AVG_SNAP = mean(TractSNAP)) %>%
+  arrange(desc(AVG_SNAP))
+
+#by counties
+ggplot(Kansas_sub)+
+  geom_boxplot(aes(x= County, y= TractSNAP, color=LAhalfand10)) +
+  theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+```
+
+## Question 7
+
+**Using either descriptive statistics or graphical comparison (or both) examine how the variables in your Kansas dataset relate to food accessibility and food assistance (SNAP). What variables most explain food accessibility and food assistance? (Show your work please.).**
+
+The first plot is demonstrating the correlation between pop2010, TractSNAP, TractKids, median family income, and LAhalfand10. From this, it seems food accessibilty is most correlated with medianfamilyincome since the the points have the least overlap compared to the other variables. TractSNAP seems to have a strong linear relationship with pop2010 which is the 2010 census data. It seems the number of houses on food assistance is positively correlated with the census count.   
+
+```{r Q7}
+
+#correlation plot
+ plot(Kansas_sub[,c(2,3,4,5,6)])
+ 
+#avg tractsnap and pop by food assistance
+Kansas_sub %>% 
+  group_by(LAhalfand10) %>%
+  summarize(SD_SNAP = sd(TractSNAP),
+            AVG_SNAP = mean(TractSNAP),
+            SD_POP = sd(POP2010),
+            AVG_POP = mean(POP2010)) %>%
+  arrange(desc(AVG_SNAP))
+
+#avg MFI and pop by food assistance
+
+Kansas_sub %>% 
+  group_by(LAhalfand10) %>%
+  summarize(SD_MFI = sd(MedianFamilyIncome),
+            AVG_MFI = mean(MedianFamilyIncome),
+            SD_POP = sd(POP2010),
+            AVG_POP = mean(POP2010)) %>%
+  arrange(desc(AVG_MFI))
+
+ 
+
+
+```
+
+## Question 8
+
+**Use the full national dataset you created in step 1 and create a state-by-state summary of each variable. Use this state summary dataset to examine how food accessibility varies across states (you can choose which measure of food accessibility to use). Which states have the most problems with food accessibility? Which have the lowest?**
+
+Vermont has the lowest average rates of food inaccessibility while Arizona has the highest with Utah having similar high rates. 
+
+```{r Q8}
+#means for all numeric variables
+
+summary_avg<-Sub_food %>% 
+  group_by(State) %>%
+  summarise_if(is.numeric, mean, na.rm = TRUE)
+
+
+#average rate of food availability by state
+Sub_food %>% 
+  group_by(State) %>%
+  summarize(AVG_Food = mean(LAhalfand10),) %>%
+  arrange(desc(AVG_Food)) %>%
+  ggplot(.)+
+    geom_point(aes(State, AVG_Food)) +
+    theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+
+
+```
+
+## Question 9
+
+**Examine the trends between 3 variables of your choice and food accessibility across states in the US and describe your findings**
+
+One interesting thing to note from my first graph, is that as the medianfamilyincome increases, poverty becomes more rare. The lower medianfaminlyincomes have higher variability in poverty rates. All thre of my figures seem to have food accessibility on the edges of the distribution, especially some that may have been true outliers. I believe if there is a pattern among these variables, it is unlikely to be linear, demonstrated by the originally plot produced comparing variables against eachother. 
+
+```{r Q9}
+#coorelation plots
+plot(Sub_food[,c(5,16,17,19)])
+
+Sub_food<-Sub_food %>% 
+  mutate(LAhalfand10 = as.character(LAhalfand10)) 
+
+
+# scatterplots for comparing my three variables across state and food availability 
+ggplot(Sub_food)+
+  geom_point(aes(x= State, y= PovertyRate, color= LAhalfand10, alpha= 0.5)) +
+  theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+ggplot(Sub_food)+
+  geom_point(aes(x= State, y= MedianFamilyIncome, color= LAhalfand10, alpha= 0.5)) +
+  theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+ggplot(Sub_food)+
+  geom_point(aes(x= State, y= TractSNAP, color= LAhalfand10, alpha= 0.5)) +
+  theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10)) 
+
+```
+
