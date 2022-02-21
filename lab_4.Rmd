@@ -1,0 +1,317 @@
+---
+title: "Lab 4"
+author: "Shannon Lynch"
+date: "2/17/2022"
+output: html_document
+---
+
+```{r setup, include=TRUE, message=FALSE}
+knitr::opts_knit$set(root.dir = 'C:/Users/scl29/OneDrive/Desktop/Kansas State/geog728')
+library(openxlsx)
+library(ggplot2)
+library(dplyr)
+library(tidyxl)
+library(tidyverse)
+
+```
+
+
+## Question 1
+
+**We will only work with the data that uses countries as Major area, region, country or area of destination so your first task is to do some creative cleaning of the imported data. To create a dataset with a single column for destination countries and separate columns for origin countries. You should have column names that mean something (e.g. no X2 column names).** 
+
+I selected counties by filtering out the nas and values greater than 900.
+
+```{r UN dat, echo=TRUE}
+
+
+#load data
+
+UN<-readWorkbook(
+  xlsxFile = "UN_MigrantStockByOriginAndDestination_2019.xlsx",
+  sheet = 2,
+  startRow = 16,
+  colNames = TRUE,
+  rowNames = FALSE,
+  detectDates = FALSE,
+  skipEmptyRows = TRUE,
+  skipEmptyCols = TRUE,
+  rows = NULL,
+  cols = NULL,
+  check.names = FALSE,
+  sep.names = ".",
+  namedRegion = NULL,
+  na.strings = "NA",
+  fillMergedCells = FALSE
+)
+
+UN2<-UN
+
+
+#name columns
+
+colnames(UN2)<- c("Year", "Sort_order", "Country of destination", "Notes", "Code", "DataTypeA", colnames(UN[7:241]))
+
+UN3<-UN2
+
+
+#Counties use codes <900 OR !=NA
+
+UN3$Code <- as.numeric(UN3$Code)
+
+UN3_f  <- UN3 %>%
+  filter(Code < 900, na.rm=TRUE)
+
+```
+
+## Question 2
+
+**Examine the dataframe you just created. Is it tidy? If not, how is it untidy? Assuming the data is untidy now you should make it tidy (give each variable its own column and each observation its own row).**
+
+There are three characteristic a data set must be to be considered tidy. Each variable should have its own column, with each row being its own observation and each cell with an individual value. This dataset violates these characteristics because countries of origin are are spread out over numerous columns. Since country of origin is a single variable, we should pivot this table longer to create an individual column. The data is also untidy because we have multiple variables at different levels of geographic region for column three.This was solved early by filtering out countries of destination.  
+
+```{r Q2, echo=TRUE}
+#use funct pivot longer so that each column from total to Zimbabwe, the last column including country of origin (cog)
+UN3c <- UN3_f %>% 
+  pivot_longer(cols= Total:Zimbabwe, 
+               names_to = "CountryOrigin",
+               values_to= "MigrantN") 
+
+```
+
+## Question 3
+
+**Now start your exploratory data analysis by examining the structure of the dataset you have constructed. Make sure you determine if you have any NA for migration values? What do these NAs mean? (You may want to check out the documentation on the UN website provided above.) Show your structural analysis below and describe what you found in words.**
+
+Our new tidy table has 8 columns (variables) and 381640 observations. From head, we can see that most of our variables are characters. One specific column, mirgrantN, we know should be numeric not a character. This will cause issues later on when examining statistics and visualizing data. Next we need to see if there are any NAs and if they make sense. We can use the is.na function in tandem with with colsums and rowsums to find how many of our rows and columns have nas. We see that there are a lot for our response variable, mirgrantN. This is because some countries did not have any migrants from all origin countries. We also have a lot in our notes column, I not too concerned since I will likely not use this column. Finally, we can see which origin countries have the highest number of NAs. This will give us and idea of what counties have the lowest number of migrants. 
+
+```{r Q3,  echo=TRUE}
+
+
+head(UN3c)
+summary(UN3c)
+sapply(UN3c, class)
+class(UN3c$MigrantN)
+
+any(is.na(UN3c)) 
+
+colSums(is.na(UN3c)) 
+
+CountryO_NA<-UN3c %>% filter(is.na(MigrantN)) %>% 
+  group_by(CountryOrigin) %>% 
+  summarize(n = n()) %>%
+  arrange(desc(n))
+
+head(CountryO_NA)
+```
+
+## Question 4
+
+**If anything about your dataset seems odd or inappropriate go ahead and do some additional cleaning or transformation now. Describe what you are doing and why.**
+
+We previous saw that notes had a high number of nas which makes it clear the column is probably unnecessary. Additionally, we have columns that are not useful for data analysis so we can also get rid of those columns, keeping Year, Country of destination, and origin country.  Since we already acknowledged that mirgrantN should be numeric, we will transform it here. Our values also vary a lot. I want to check to see if there are any outliers. I did this my calculating the lower and upper bound and use the which function to find the outliers.I also found that there are some 
+
+```{r Q4,  echo=TRUE}
+
+
+
+UN3c2 <-UN3c %>%
+  select(-c(Sort_order, Notes, Code, DataTypeA))
+
+UN3c2$MigrantN <- as.numeric(UN3c2$MigrantN)
+class(UN3c2$MigrantN)
+
+#remove na
+
+noNA_UN<-data.frame(na.omit(UN3c2))
+
+noNA_UN$MigrantN <- as.numeric(noNA_UN$MigrantN)
+class(noNA_UN$MigrantN)
+class(UN3c2$MigrantN)
+
+head(UN3c2)
+
+any(is.na(noNA_UN))
+
+
+lower_bound <- quantile(noNA_UN$MigrantN, 0.025)
+lower_bound
+
+upper_bound <- quantile(noNA_UN$MigrantN, 0.975)
+upper_bound
+
+#outlier_ind <- which(noNA_UN$MigrantN < lower_bound | noNA_UN$MigrantN > upper_bound)
+
+
+#noNA_UN[outlier_ind, ]
+
+
+#
+noNA_UN2<- noNA_UN%>% 
+  filter(MigrantN < upper_bound & MigrantN>lower_bound ) %>%
+   arrange(desc(MigrantN)) 
+
+head(noNA_UN2)
+
+```
+
+## Question 5
+
+**Now move on to describing the important values and variation in your dataset. Describe in words what you find**
+
+The first thing I found was the was the mean, sd, median, and sum for migrants by country origin. Here we see that Mexico, Russian Federation, India, Bangladesh had the highest mean emigrants. Next I examined those same statistics by country of destination. We saw here that Saudi Arabia, Pakistan Iran (Islamic Republic of, United States of America, Ukraine have the highest mean immigrants. Generally, we can see from the high an low standard deviations, this dataset has a lot of variation.   
+
+```{r Q5,  echo=TRUE}
+#mean, median, sd, and sum migrants by country origin
+MigrantsO<-UN3c2 %>%
+  group_by(CountryOrigin)%>%
+  summarize(meanMigrantsO = mean(MigrantN, na.rm=T),
+             sdMigrantsO = sd(MigrantN, na.rm=T),
+            medMigrantsO = median(MigrantN, na.rm=T),
+          sumMigrantsD = sum(MigrantN, na.rm=T))%>%
+  arrange(desc(meanMigrantsO))
+head(MigrantsO)
+
+
+#mean migrants by country of destination
+MigrantsD<-UN3c2 %>%
+  group_by(`Country of destination`)%>%
+  summarize(meanMigrantsD = mean(MigrantN, na.rm=T),
+            sdMigrantsO = sd(MigrantN, na.rm=T),
+            medMigrantsO = median(MigrantN, na.rm=T),
+          sumMigrantsD = sum(MigrantN, na.rm=T))%>%
+  arrange(desc(meanMigrantsD))
+head(MigrantsD)
+
+
+highsd <- mean(noNA_UN$MigrantN) + 2*sd(noNA_UN$MigrantN)
+lowsd <- mean(noNA_UN$MigrantN) - 2*sd(noNA_UN$MigrantN)
+
+
+
+
+```
+
+## Question 6
+
+**Visualization the important data distributions in your dataset and describe**
+
+Previously, I found that there were a lot of outliers. I started here by plotting the distributions of the two to compare. Both of these distributions are clearly not normal, but removing the outliers seem to clean up the distributions some. I also chose to look at the histogram of both the mean Migrants for both Origin and Destination. Just as with the whole dataset, it has a long right tail. To be more confident my data is not normal, as I expect, I ran a ks test and plotted a qq-plot. Both of these measures confirmed neither data set (with and without outliers) is normally distributed. 
+
+```{r Q6,  echo=TRUE}
+
+
+hist(noNA_UN$MigrantN, breaks = 100, col="lightblue")
+hist(noNA_UN2$MigrantN, breaks = 100, col="lightblue")
+
+
+hist(MigrantsO$meanMigrantsO, 100)
+
+hist(MigrantsD$meanMigrantsD, 100)
+
+ggplot(UN3c2, aes(sample = MigrantN)) +
+  stat_qq() +
+  stat_qq_line()
+
+ggplot(noNA_UN2, aes(sample = MigrantN)) +
+  stat_qq() +
+  stat_qq_line()
+
+
+ks.test(noNA_UN2$MigrantN, "pnorm")
+
+
+ggplot(data = noNA_UN2) +
+  geom_bar(mapping = aes(x = CountryOrigin)) +
+  theme(axis.text.x = element_text(angle = 90, size=1)) +
+  theme_minimal() 
+
+```
+
+## Question 7
+
+**Explore trends and patterns in your dataset using graphic visualizations and describe what you find.**
+
+My first figure is hard to interpret but can give a broad sense of the whole dataset. There are a lot more light blue dots than dark dots across all countries. This indicates that migrants are increasing as time passes. I made the second figure so that I could see how much migrants varies with country of destination. From the various bar sizes, we can see some countries have a lot more migrants than others. For the next figure, I filtered out the countries of destination that had the most migrants. I chose to log transform the data since it was still not normal. I selected two random countries from list this to examine where their migrants were originating from. Both of these countries had high numbers of migrants from India. United Arab Emirates also had higher numbers of Bangladesh and Egypt while Pakistan had a high number from Afghanistan.
+
+```{r Q7,  echo=TRUE}
+
+
+#All countries of destination
+ggplot(noNA_UN2) + 
+  geom_point(aes(y = MigrantN, x= Country.of.destination , color= Year, alpha=.5)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, size = 2))+
+labs(title = "All countries Scatter") +
+  xlab ("Country of Destination") +
+  ylab ("Number of Migrants")
+
+#barplot
+ggplot(noNA_UN2) + 
+  geom_bar(aes(x= Country.of.destination, color= Year)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, size = 2))+
+  labs(title = "All countries Bar") +
+  xlab ("Country of Destination") +
+  ylab ("Number of Migrants")
+
+#next I wanted a better look at the countries that have the most migrants coming in
+noNA_UN2 %>% 
+  filter(Country.of.destination %in% c( "United States of America",         
+ "Russian Federation",                
+ "Germany"          ,                 
+   "Saudi Arabia"    ,                  
+  "France"            ,                
+   "United Kingdom"    ,                
+   "Canada"           ,                 
+   "India"             ,                
+   "Ukraine"          ,                 
+ "Australia"           ,              
+  "United Arab Emirates",              
+  "Pakistan"             ,             
+  "Italy"                 ,            
+  "Spain"                  ,           
+ "Kazakhstan"  )) %>%
+  ggplot(data = .) +
+    geom_boxplot(mapping = aes(x = Country.of.destination, y = log(MigrantN), color= Year)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    xlab("Country of Destination") +
+    ylab("Number of Migrants") +
+    ggtitle("Top Counties of Destination")
+
+
+noNA_UN %>% 
+  filter(Country.of.destination %in% c(          
+ "United Arab Emirates"))  %>%
+  ggplot(data = .) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    geom_point(mapping = aes(x = CountryOrigin, y = MigrantN, color= Year))+
+  xlab("Country of Origin") +
+    ylab("Number of Migrants") +
+    ggtitle("United Arab Emirates")
+
+noNA_UN %>% 
+  filter(Country.of.destination %in% c(          
+ "Pakistan"))  %>%
+  ggplot(data = .) +
+  theme(axis.text.x = element_text(angle = 90)) +
+    geom_boxplot(mapping = aes(x = CountryOrigin, y = MigrantN)) +
+  xlab("Country of Origin") +
+    ylab("Number of Migrants") +
+    ggtitle("Pakistan")
+
+```
+
+ 
+
+##
+
+**Q8:  Save your created dataframe to a csv file using the write_csv() function. Save this file in your active R Project.**
+
+```{r dataframe, echo=TRUE}
+
+write.csv(noNA_UN, file = "Final_df1.csv")
+
+
+
+```
