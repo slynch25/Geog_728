@@ -1,0 +1,194 @@
+---
+title: "Lab 2"
+author: "Shannon Lynch"
+date: "2/3/2022"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+
+**For the gapminder data, order countries in reverse alphabetical order, then display the first 15. This should work out pretty well in this case, but can you think of any potential issues with this process that might lead to ordering problems in a different dataset? (Hint: Go back to the basics and check to make sure you understand what kind of data you are working with.) ** 
+
+The package dplyr exists within the tidyverse which overwrites some base R functions when loaded. If your code includes these, you may run into trouble. They also change dataframes into tibbles and thus won't work with certain data types.
+
+
+
+```{r Q1}
+#load libraries 
+
+library(gapminder)
+library(dplyr)
+
+#examine headers
+head(gapminder)
+
+
+# arrange my data using the arrange function and making it so its decsending by country
+gapminder %>% 
+  arrange(desc(., country)) %>%
+  head(15)
+
+```
+
+## Question 2
+
+**Calculate and display the mean, median, and standard deviation for the Life expectancy, Population, and GDPperCapita in the gapminder dataset.**
+
+```{r Q2}
+
+#calculating mean, median, and SD for Life expectancy
+gapminder %>% 
+  summarize(LE_mean = mean(lifeExp),
+            LE_median = median(lifeExp),
+            LE_sd = sd(lifeExp))
+
+#calculating mean, median, and SD for population
+gapminder %>% 
+  summarize(POP_mean = mean(pop),
+            POP_median = median(pop),
+           POP_sd = sd(pop))
+
+#calculating mean, median, and SD for GDPperCapita
+gapminder %>% 
+  summarize(GDP_mean = mean(gdpPercap),
+            GDP_median = median(gdpPercap),
+           GDP_sd = sd(gdpPercap))
+
+
+```
+
+## Question 3
+
+**Calculate and display in a single dataframe the mean values for Life expectancy, Population, and GDPperCapita for each continent.**
+
+```{r Q3}
+
+#single dataframe the mean values for Life expectancy, Population, and GDPperCapita grouped by continent 
+gapminder %>% 
+  group_by(continent) %>%
+  summarize(LE_mean = mean(lifeExp),
+            POP_mean = mean(pop),
+            GDP_mean = mean(gdpPercap))
+      
+
+```
+
+## Question 4
+
+**Create a scatter plot of the global average Life expectancy over time and display the first 5 records for the dataset used to build this plot. Customize the display of the plot to make it less blah.**
+
+```{r Q4}
+
+#load ggplot
+library(ggplot2)
+
+#group my data by year and then find mean of life exp for each of these years, print first 5 rows
+LE_by_yr<- gapminder %>% 
+              group_by(year) %>%
+              summarize(LE_mean = mean(lifeExp))
+head(LE_by_yr, 5)
+
+
+#create a ggplot with year as x axis and mean life expectancy on the y axis
+ggplot(LE_by_yr) + 
+  theme_minimal() +
+  geom_point(aes(x= year, y= (LE_mean), color= year), size= 4) +
+  labs(title= "Life Expectancy", y= "Mean Life Expectancy", x= "Year")
+
+
+
+```
+
+## Question 5
+
+**Pull in a dataset of your choice from the datasets package that has a dataframe structure (not sure what’s available, try ?datasets). Then examine the structure of the data including: class types, header information, and dimensions.**
+
+The dimensions of this table are 84 rows by 5 columns. There are 5 variables in this dataset, plant, type, treatment, conc, and uptake. Plant is the code for a particular plant that received multiple treatments (nonchilled and chilled) and concentrations of CO2 (six different concentrations ranging from 95-1000)and the plants uptake of CO2. The column Type is the location of the two groups of plants used (Quebec and Mississippi). Type and treatment are both factors while concentration and uptake are numeric. Plant is an ordered factor. 
+
+
+
+```{r Q5}
+
+#looking at what datasets are available 
+
+library(help = "datasets")
+
+#look at tibble to see my dataset headers and its classes
+head(CO2, 5) 
+
+#double check classes
+class(CO2$Plant)
+class(CO2$Type)
+class(CO2$Treatment)
+class(CO2$conc)
+class(CO2$uptake)
+
+#double check dim
+dim(CO2)
+
+```
+
+## Question 6
+
+**Calculate general summary statistics for the dataset.**
+
+```{r Q6, echo=FALSE}
+
+#getting summary statistics
+base::summary(CO2)
+
+```
+
+## Question 7
+
+**Calculate summary statistics for groups/subsets of the dataset (these groupings could be based on time period, species, location, etc…).**
+
+```{r Q7}
+
+#mean uptake for type and treatment
+CO2%>% 
+     group_by(Type, Treatment) %>%
+     summarize(mean_uptake = mean(uptake))
+
+#mean uptake for treatment and concentration 
+CO2%>% 
+     group_by(Treatment, conc) %>%
+     summarize(mean_uptake = mean(uptake))
+
+#mean uptake for plant
+CO2%>% 
+     group_by(Plant) %>%
+     summarize(mean_uptake = mean(uptake))
+
+```
+
+## Question 8
+
+**Create 2 plots of your choice, one showing grouped data and the other showing ungrouped data. Give each plot a title and descriptive x and y axis labels. Customize at least one graphic option (color, point type, line width, etc…) on these plots.**
+
+```{r Q8}
+#plot 1 ungrouped
+
+ggplot(CO2) + 
+  geom_histogram(aes(x = uptake), fill = "darkred", bins = 15) +
+  theme_classic()+
+  labs(title = "CO2 uptake", subtitle = "A histogram") +
+  xlab ("CO2 Uptake") +
+  ylab ("Frequency")
+
+#plot 2 grouped by treatment and type
+
+ggplot(CO2) + 
+  geom_boxplot(aes(y = uptake , x= Treatment, color= Type), fill = "lightgray") +
+  theme_minimal() +
+  labs(title = "CO2 uptake", subtitle = "for grassland plants") +
+  xlab ("Treatment") +
+  ylab ("CO2 Uptake")
+```
+
+
