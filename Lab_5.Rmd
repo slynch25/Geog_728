@@ -1,0 +1,255 @@
+---
+title: "Lab 5"
+author: "Shannon Lynch"
+date: "3/1/2022"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(pacman)
+
+p_load(sf, sp, spData, rgdal, tidyverse, ggplot2, ggrepel, ggspatial, shadowtext)
+
+
+```
+
+## Question 1
+
+**Examine the world and worldbank_df datasets. Describe what kind of data objects they are and their general structure and makeup. Then combine these two data objects into a single spatial data object. Does the resulting data object look right?** 
+
+The world dataframe included the geometries and descriptor variables for various countries across the world. Some of the descriptors include, continent, country (name_long), and region as well as population and other related statistics (Life expectancy and gdp). The worldbank_df includes more information on these countries such as literacy, urban population size, unemployment and others. Since these two dataframes have a column in common, country, we can use this column to join these datasets using left join function. The resulting dataset look right, call of the classes seem correct and the columns are lined up with the correct variable. 
+
+
+```{r Q1}
+#load data 
+
+data(world)
+
+data(worldbank_df)
+
+#examine the two dataframes
+
+glimpse(world)
+glimpse(worldbank_df)
+
+st_crs(world)
+
+
+world_join<- left_join(world, worldbank_df, by= c("name_long"= "name"))
+glimpse(world_join)
+
+world_join$name_long <- as.factor(world_join$name_long)
+world_join$urban_pop <- as.numeric(world_join$urban_pop)
+
+class(world_join)
+
+head(world_join)
+st_crs(world_join)
+```
+
+## Question 2
+
+**Make some basic (non-spatial) plots to explore differences in urban population and literacy across countries.**
+
+The dataset included a lot of different countries so to better visualise the data, I choose to subset the data for just countries that had higher than average literacy or urban populations. For each these graphs, I used the factor not used as a color scale. This was so we could examine what the relative levels of literacy were for the countries with above average urban populations and vice versa. The final graph just examines how literacy varies against urban population. There did not seem to be a strong correlation between literacy and urban population. I tried to get geom_text to work so each point was labeled but was running into issues.  
+
+```{r Q2}
+
+
+ #above average urban pop
+   world_join %>%
+  filter(urban_pop > mean(world_join$urban_pop, na.rm= TRUE)) %>%
+ggplot(.) +
+  geom_point(aes(x=name_long, y= urban_pop, color= literacy))+
+      theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+#above average literacy   
+   world_join %>%
+  filter(literacy > mean(world_join$literacy, na.rm= TRUE)) %>%
+ggplot(.) +
+  geom_point(aes(x=name_long, y= literacy, color= urban_pop))+
+      theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+#literacy verses urban pop
+   
+   
+   ggplot(world_join)+
+     geom_point( aes(x=literacy, y=urban_pop))+
+      ylim(0, 200000000)
+                     
+                     
+      
+
+
+```
+
+## Question 3
+
+**Now make some maps to explore urban population and literacy across countries.**
+
+I started with some basic maps just to get an idea for general trends and what countries had population and literacy data.We see that china by far has the highest amount of urban population. Since it is so much larger than the other countries, I will log transform the data so differents between other countries can be seen. The basic map of literacy shows that we are very data limited (a lot of NAs). There doesn't seem to be large differences in scale, so I won;t tranform this data. I then recreated these plots in order to make them look nicer and portray more information such as country name. We see the same trends in these clean data, demostrating everything seemed to work. 
+
+```{r Q3}
+
+#basic maps 
+plot(world_join[ ,"urban_pop"])
+ 
+plot(world_join[ ,"literacy"])
+
+#find centroids of countries base on literacy
+prod_pts<-cbind(world_join[!is.na(world_join$urban_pop),], st_coordinates(st_centroid(world_join[!is.na(world_join$urban_pop),]))) 
+
+#plot the world make with a color scale indicating literacy 
+ggplot() +
+  geom_sf(data = world_join, aes(fill=log(urban_pop)), alpha=0.7, col="black") +
+  scale_fill_continuous(na.value="white") +
+  theme_minimal() +
+  theme(legend.position="bottom")+
+  labs(fill= "Literacy)", size=NULL) +
+  geom_text_repel(data=prod_pts, aes(x=X, y=Y, label=name_long), size=2) + 
+  xlab(NULL) + ylab(NULL) +
+    annotation_scale(location = "br", style="bar", width_hint = 0.1, 
+                     pad_y = unit(0, "in"), pad_x =unit(1.1, "in")) +
+    annotation_north_arrow(location = "br", which_north = "grid", 
+                           pad_x = unit(0.75, "in"), pad_y = unit(0.05, "in"), 
+                           height= unit(0.25, "in"), width = unit(0.25, "in")) 
+
+#find centroids of countries base on literacy
+prod_pts<-cbind(world_join[!is.na(world_join$literacy),], st_coordinates(st_centroid(world_join[!is.na(world_join$literacy),]))) 
+
+#plot the world make with a color scale indicating literacy 
+ggplot() +
+  geom_sf(data = world_join, aes(fill=literacy), alpha=0.7, col="black") +
+  scale_fill_continuous(na.value="white") +
+  theme_minimal() +
+  theme(legend.position="bottom")+
+  labs(fill= "Literacy)", size=NULL) +
+  geom_text_repel(data=prod_pts, aes(x=X, y=Y, label=name_long), size=2) + 
+  xlab(NULL) + ylab(NULL) +
+    annotation_scale(location = "br", style="bar", width_hint = 0.1, 
+                     pad_y = unit(0, "in"), pad_x =unit(1.1, "in")) +
+    annotation_north_arrow(location = "br", which_north = "grid", 
+                           pad_x = unit(0.75, "in"), pad_y = unit(0.05, "in"), 
+                           height= unit(0.25, "in"), width = unit(0.25, "in")) 
+
+
+
+
+
+```
+
+## Question 4
+
+**Make some basic (non-spatial) plots to explore differences in urban population and literacy across continents.**
+
+Since we are now examining these two variables at a different level, continent, I will use a boxplot instead of point to demonstrate the variability within continents. I did this for both literacy and urban population. Finally, I made the same scatter plot as before, this time coloring them by continent. 
+
+```{r Q4}
+
+
+
+
+ #above average urban pop
+   world_join %>%
+  filter(urban_pop > 0)%>%
+ggplot(.) +
+  geom_boxplot(aes(x=continent, y= log(urban_pop), color= continent))+
+      theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+#above average literacy   
+   world_join %>%
+  filter(literacy > 0)%>%
+ggplot(.) +
+  geom_boxplot(aes(x=continent, y= literacy, color= continent))+
+      theme(axis.text.x = element_text(angle = 90), text = element_text(size= 10) )
+
+#literacy verses urban pop
+
+    ggplot(world_join)+
+     geom_point( aes(x=literacy, y=urban_pop, color= continent))+
+     ylim(0, 200000000)
+      
+
+
+
+```
+
+## Question 5
+
+**Now make some maps to explore differences in urban population and literacy across continents. Change to a different, projected coordinate system for these maps.**
+
+The first step was find an appropriate crs for a global map. I used google for suggestions then found the +proj on spatialreference. I then made similar graph as before, this time grouping by continent summerizing it by the mean literacy or urban population. I also added the names of the continents to the final maps. 
+
+```{r Q5}
+
+
+Nworld_join<- st_transform(world_join, st_crs("+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs "))
+
+st_crs(Nworld_join)
+
+lit_cont<-Nworld_join %>%
+  group_by(continent) %>%
+  summarize(literacy = mean(literacy, na.rm= TRUE))%>%
+  filter(!is.na(literacy))
+
+
+#find centroids of countries base on literacy
+prod_pts<-cbind(lit_cont[!is.na(lit_cont$literacy),], st_coordinates(st_centroid(lit_cont[!is.na(lit_cont$literacy),]))) 
+
+#plot the world make with a color scale indicating literacy 
+
+lit_cont %>%
+  group_by(continent) %>%
+  summarize(literacy = mean(literacy, na.rm= TRUE))%>%
+  filter(!is.na(literacy))%>%
+ggplot(.) +
+  geom_sf(data = lit_cont, aes(fill=literacy), alpha=0.7, col="black") +
+  scale_fill_continuous(na.value="white") +
+  theme_minimal() +
+  theme(legend.position="bottom", text = element_text(size= 9))+
+  labs(fill= "Literacy", size=NULL) +
+  geom_text_repel(data=prod_pts, aes(x=X, y=Y, label=continent), size=4) + 
+  xlab(NULL) + ylab(NULL) +
+    annotation_scale(location = "br", style="bar", width_hint = 0.1, 
+                     pad_y = unit(0, "in"), pad_x =unit(1.1, "in")) +
+    annotation_north_arrow(location = "br", which_north = "grid", 
+                           pad_x = unit(0.75, "in"), pad_y = unit(0.05, "in"), 
+                           height= unit(0.25, "in"), width = unit(0.25, "in")) 
+
+urban_cont<-world_join %>%
+  group_by(continent) %>%
+  summarize(urban_pop = mean(urban_pop, na.rm= TRUE))%>%
+  filter(!is.na(urban_pop))
+
+
+#find centroids of countries base on literacy
+prod_pts<-cbind(urban_cont[!is.na(urban_cont$urban_pop),], st_coordinates(st_centroid(urban_cont[!is.na(urban_cont$urban_pop),]))) 
+
+#plot the world make with a color scale indicating literacy 
+
+
+
+urban_cont %>%
+  group_by(continent) %>%
+  summarize(urban_pop = mean(urban_pop, na.rm= TRUE))%>%
+  filter(!is.na(urban_pop))%>%
+ggplot(.) +
+  geom_sf(data = urban_cont, aes(fill=urban_pop), alpha=0.7, col="black") +
+  scale_fill_continuous(na.value="white") +
+  theme_minimal() +
+  theme(legend.position="bottom", text = element_text(size= 9)  )+
+  labs(fill= "Urban population", size=NULL) +
+  geom_text_repel(data=prod_pts, aes(x=X, y=Y, label=continent), size=5, color= "black") + 
+  xlab(NULL) + ylab(NULL) +
+    annotation_scale(location = "br", style="bar", width_hint = 0.1, 
+                     pad_y = unit(0, "in"), pad_x =unit(1.1, "in")) +
+    annotation_north_arrow(location = "br", which_north = "grid", 
+                           pad_x = unit(0.75, "in"), pad_y = unit(0.05, "in"), 
+                           height= unit(0.25, "in"), width = unit(0.25, "in")) 
+
+
+
+```
